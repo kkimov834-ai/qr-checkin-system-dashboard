@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İşçi İzləmə Paneli</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f7; color: #2d3748; min-height: 100vh; }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a, #2b6cb0);
+            color: #fff; padding: 18px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 12px;
+        }
+        header h1 { font-size: 21px; }
+        .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .controls input[type="date"] { padding: 8px 10px; border: none; border-radius: 8px; font-size: 14px; }
+        #last-updated { font-size: 12px; opacity: 0.85; }
+
+        .container { max-width: 1100px; margin: 20px auto; padding: 0 16px 40px; }
+
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .stat-card .label { font-size: 13px; color: #718096; }
+        .stat-card .value { font-size: 25px; font-weight: bold; margin-top: 4px; }
+        .stat-card.green .value { color: #2f855a; }
+
+        .panel { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 18px; margin-bottom: 20px; }
+        .panel h2 { font-size: 17px; margin-bottom: 14px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; text-align: left; font-size: 14px; }
+        th { color: #718096; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; }
+        tbody tr.emp-row { border-bottom: 1px solid #edf2f7; cursor: pointer; }
+        tbody tr.emp-row:hover { background: #f7fafc; }
+        .rank { font-weight: bold; color: #a0aec0; width: 40px; font-size: 16px; }
+        .emp-name { font-weight: 600; }
+        .badge { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; vertical-align: middle; }
+        .badge-in { background: #c6f6d5; color: #22543d; }
+        .badge-out { background: #e2e8f0; color: #4a5568; }
+        .hours { font-weight: bold; color: #2b6cb0; }
+        tr.detail-row td { background: #f7fafc; cursor: default; padding: 4px 8px 12px; }
+        .sessions { list-style: none; padding-left: 48px; }
+        .sessions li { padding: 3px 0; font-size: 13px; color: #4a5568; }
+        .sessions .in { color: #2f855a; font-weight: 600; }
+        .sessions .out { color: #c53030; font-weight: 600; }
+        .sessions .dur { color: #718096; }
+
+        .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .bar-name { width: 160px; font-size: 13px; font-weight: 600; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar-track { flex: 1; background: #edf2f7; border-radius: 8px; height: 30px; overflow: hidden; }
+        .bar-fill {
+            height: 100%; border-radius: 8px; min-width: 90px;
+            background: linear-gradient(90deg, #4299e1, #2b6cb0);
+            color: #fff; font-size: 12px; font-weight: bold;
+            display: flex; align-items: center; padding-left: 10px; white-space: nowrap;
+            transition: width 0.6s ease;
+        }
+        .bar-fill.top { background: linear-gradient(90deg, #ecc94b, #d69e2e); }
+
+        .empty { text-align: center; color: #a0aec0; padding: 30px 0; }
+
+        @media (max-width: 640px) {
+            .bar-name { width: 100px; font-size: 12px; }
+            th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) { display: none; }
+            .sessions { padding-left: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>📊 İşçi İzləmə Paneli</h1>
+    <div class="controls">
+        <input type="date" id="date-picker">
+        <span id="last-updated"></span>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="label">İşçi sayı</div>
+            <div class="value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card green">
+            <div class="label">İşdə olan</div>
+            <div class="value" id="stat-working">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Cəmi iş saatı</div>
+            <div class="value" id="stat-hours">0</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>🏆 İş Saatları Reytinqi (ən çox işləyən başda)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>İşçi</th>
+                    <th>Ümumi iş saatı</th>
+                    <th>İlk giriş</th>
+                    <th>Son çıxış</th>
+                </tr>
+            </thead>
+            <tbody id="board-body"></tbody>
+        </table>
+        <div id="board-empty" class="empty" style="display:none;">Bu tarix üçün qeyd yoxdur.</div>
+    </div>
+
+    <div class="panel">
+        <h2>📈 Kim daha çox işləyib? (qrafik)</h2>
+        <div id="chart"></div>
+        <div id="chart-empty" class="empty" style="display:none;">Bu tarix üçün qeyd yoxdur.</div>
+    </div>
+
+</div>
+
+<script>
+    const datePicker = document.getElementById('date-picker');
+    const refreshSec = Math.max(5, parseInt(new URLSearchParams(location.search).get('refresh'), 10) || 10);
+    let employees = [];
+    let expandedNames = new Set();
+
+    // ---- Tarix köməkçiləri (Baku saatı) ----
+    function bakuParts(d = new Date()) {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Baku', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).formatToParts(d);
+        const o = {};
+        for (const p of parts) o[p.type] = p.value;
+        return o;
+    }
+    function bakuTodayStr() { const p = bakuParts(); return `${p.day}.${p.month}.${p.year}`; }
+    function pickerToBaku(v) { const [y, m, d] = v.split('-'); return `${d}.${m}.${y}`; }
+    function bakuToPicker(s) { const [d, m, y] = s.split('.'); return `${y}-${m}-${d}`; }
+
+    // ---- HTML təhlükəsizliyi ----
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function fmtDur(ms) {
+        if (ms < 60000) return Math.max(1, Math.floor(ms / 1000)) + ' san';
+        const totalMin = Math.floor(ms / 60000);
+        const h = Math.floor(totalMin / 60), m = totalMin % 60;
+        return h > 0 ? `${h} saat ${m} dəq` : `${m} dəq`;
+    }
+
+    // ---- Hadisələri işçi sessiyalarına çevir ----
+    function computeEmployees(events) {
+        const byName = {};
+        for (const e of [...events].sort((a, b) => new Date(a.at) - new Date(b.at))) {
+            if (!byName[e.userName]) byName[e.userName] = { name: e.userName, sessions: [], currentIn: null };
+            const emp = byName[e.userName];
+            if (e.status === 'IN') {
+                emp.currentIn = e;
+            } else if (e.status === 'OUT' && emp.currentIn) {
+                emp.sessions.push({ in: emp.currentIn, out: e });
+                emp.currentIn = null;
+            }
+        }
+
+        const now = Date.now();
+        return Object.values(byName).map(emp => {
+            let totalMs = 0, firstIn = null, lastOut = null;
+            for (const s of emp.sessions) {
+                totalMs += new Date(s.out.at) - new Date(s.in.at);
+                if (!firstIn || new Date(s.in.at) < new Date(firstIn.at)) firstIn = s.in;
+                if (!lastOut || new Date(s.out.at) > new Date(lastOut.at)) lastOut = s.out;
+            }
+            if (emp.currentIn) {
+                totalMs += now - new Date(emp.currentIn.at);
+                if (!firstIn || new Date(emp.currentIn.at) < new Date(firstIn.at)) firstIn = emp.currentIn;
+            }
+            return {
+                name: emp.name,
+                sessions: emp.sessions,
+                openSession: emp.currentIn,
+                totalMs, firstIn, lastOut,
+                isWorking: !!emp.currentIn
+            };
+        }).sort((a, b) => b.totalMs - a.totalMs || a.name.localeCompare(b.name, 'az'));
+    }
+
+    // ---- Render ----
+    function render() {
+        // Statistikalar
+        const workingCount = employees.filter(e => e.isWorking).length;
+        const totalMs = employees.reduce((sum, e) => sum + e.totalMs, 0);
+        document.getElementById('stat-total').innerText = employees.length;
+        document.getElementById('stat-working').innerText = workingCount;
+        document.getElementById('stat-hours').innerText = fmtDur(totalMs);
+
+        // Cədvəl
+        const body = document.getElementById('board-body');
+        const boardEmpty = document.getElementById('board-empty');
+        const chart = document.getElementById('chart');
+        const chartEmpty = document.getElementById('chart-empty');
+
+        if (employees.length === 0) {
+            body.innerHTML = '';
+            chart.innerHTML = '';
+            boardEmpty.style.display = 'block';
+            chartEmpty.style.display = 'block';
+            return;
+        }
+        boardEmpty.style.display = 'none';
+        chartEmpty.style.display = 'none';
+
+        const medals = ['🥇', '🥈', '🥉'];
+        let rowsHtml = '', chartHtml = '';
+        const maxMs = Math.max(...employees.map(e => e.totalMs), 1);
+
+        employees.forEach((emp, i) => {
+            const badge = emp.isWorking
+                ? '<span class="badge badge-in">İşdə</span>'
+                : '<span class="badge badge-out">Çıxıb</span>';
+            const firstIn = emp.firstIn ? emp.firstIn.time : '—';
+            const lastOut = emp.lastOut ? emp.lastOut.time : '—';
+
+            rowsHtml += `<tr class="emp-row" data-idx="${i}">
+                <td class="rank">${medals[i] || (i + 1)}</td>
+                <td class="emp-name">${esc(emp.name)}${badge}</td>
+                <td class="hours">${fmtDur(emp.totalMs)}</td>
+                <td>${firstIn}</td>
+                <td>${lastOut}</td>
+            </tr>`;
+
+            let sessionsHtml = '';
+            for (const s of emp.sessions) {
+                sessionsHtml += `<li><span class="in">Giriş: ${s.in.time}</span> → <span class="out">Çıxış: ${s.out.time}</span> <span class="dur">(${fmtDur(new Date(s.out.at) - new Date(s.in.at))})</span></li>`;
+            }
+            if (emp.openSession) {
+                sessionsHtml += `<li><span class="in">Giriş: ${emp.openSession.time}</span> → <span class="dur">hələ işdə (${fmtDur(Date.now() - new Date(emp.openSession.at))})</span></li>`;
+            }
+            rowsHtml += `<tr class="detail-row" data-idx="${i}"${expandedNames.has(emp.name) ? '' : ' hidden'}><td colspan="5"><ul class="sessions">${sessionsHtml}</ul></td></tr>`;
+
+            const width = Math.max((emp.totalMs / maxMs) * 100, 8);
+            const topClass = i === 0 ? ' top' : '';
+            chartHtml += `<div class="bar-row">
+                <div class="bar-name">${medals[i] || ''} ${esc(emp.name)}</div>
+                <div class="bar-track"><div class="bar-fill${topClass}" style="width:${width}%">${fmtDur(emp.totalMs)}</div></div>
+            </div>`;
+        });
+
+        body.innerHTML = rowsHtml;
+        chart.innerHTML = chartHtml;
+    }
+
+    // Sətira klik → detalları aç/bağla (ad ilə yadda saxla ki, yenilənmədən sonra da açıq qalsın)
+    document.getElementById('board-body').addEventListener('click', function(ev) {
+        const row = ev.target.closest('tr.emp-row');
+        if (!row) return;
+        const name = employees[row.dataset.idx] && employees[row.dataset.idx].name;
+        const detail = this.querySelector(`tr.detail-row[data-idx="${row.dataset.idx}"]`);
+        if (!detail) return;
+        if (name) {
+            if (detail.hidden) expandedNames.add(name); else expandedNames.delete(name);
+        }
+        detail.hidden = !detail.hidden;
+    });
+
+    // ---- Məlumat yükləmə ----
+    async function load() {
+        try {
+            const res = await fetch('/api/events?date=' + encodeURIComponent(pickerToBaku(datePicker.value)));
+            const data = await res.json();
+            employees = computeEmployees(data.events || []);
+            render();
+            document.getElementById('last-updated').innerText =
+                'Yeniləndi: ' + new Date().toLocaleTimeString('az-AZ') + ` (avtomatik, hər ${refreshSec} saniyə)`;
+        } catch (err) {
+            console.error('Yükləmə xətası:', err);
+        }
+    }
+
+    datePicker.value = bakuToPicker(bakuTodayStr());
+    datePicker.addEventListener('change', load);
+    load();
+    setInterval(load, refreshSec * 1000);
+</script>
+
+</body>
+</html>
