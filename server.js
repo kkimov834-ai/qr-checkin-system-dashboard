@@ -61,6 +61,9 @@ app.get('/api/meta', (req, res) => {
     });
 });
 
+// Köhnə layihədən öyrəşilmiş /dashboard ünvanı da işləsin
+app.get('/dashboard', (req, res) => res.redirect('/'));
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
     console.log(`📊 İşçi İzləmə Paneli: http://localhost:${PORT}`);
