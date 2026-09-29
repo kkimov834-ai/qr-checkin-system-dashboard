@@ -124,6 +124,11 @@
 <script>
     const datePicker = document.getElementById('date-picker');
     const refreshSec = Math.max(5, parseInt(new URLSearchParams(location.search).get('refresh'), 10) || 10);
+
+    // Vercel-də açılıbsa məlumatı PC-dəki ictimai tüneldən çək, lokalda öz serverindən
+    const API_BASE = /vercel\.app$/.test(location.hostname)
+        ? 'https://BURAYA_DOMEEN.ngrok-free.app'
+        : '';
     let employees = [];
     let expandedNames = new Set();
 
@@ -270,7 +275,9 @@
     // ---- Məlumat yükləmə ----
     async function load() {
         try {
-            const res = await fetch('/api/events?date=' + encodeURIComponent(pickerToBaku(datePicker.value)));
+            const res = await fetch(API_BASE + '/api/events?date=' + encodeURIComponent(pickerToBaku(datePicker.value)), {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+            });
             const data = await res.json();
             employees = computeEmployees(data.events || []);
             render();
@@ -278,6 +285,7 @@
                 'Yeniləndi: ' + new Date().toLocaleTimeString('az-AZ') + ` (avtomatik, hər ${refreshSec} saniyə)`;
         } catch (err) {
             console.error('Yükləmə xətası:', err);
+            document.getElementById('last-updated').innerText = '⚠️ Serverə qoşulmaq mümkün olmadı (PC/server sönülüdür?)';
         }
     }
 
